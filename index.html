@@ -170,10 +170,12 @@
   </aside>
   <main class="map-area">
     <canvas id="mapCanvas"></canvas>
-    <div class="map-hint">DIJKSTRA'S ALGORITHM — SHORTEST PATH</div>
+    <div class="map-hint">Dijkstra's Algorithm — shortest path</div>
   </main>
 </div>
 <script>
+
+// all the nodes (basically locations on the map)
 const NODES=[
   {id:0,label:"Main Camp",type:"base",x:0.08,y:0.48},
   {id:1,label:"North Shelter",type:"shelter",x:0.22,y:0.14},
@@ -194,6 +196,8 @@ const NODES=[
   {id:16,label:"Aid Camp",type:"base",x:0.88,y:0.45},
   {id:17,label:"South Shelter",type:"shelter",x:0.30,y:0.88},
 ];
+
+// edges = roads between nodes (a, b, cost)
 const EDGES=[
   [0,1,4],[0,5,3],[0,7,5],[0,12,6],
   [1,2,8],[1,7,4],[1,15,5],[1,6,7],
@@ -214,39 +218,63 @@ const EDGES=[
   [16,3,4],[16,11,5],[16,4,6],
   [17,5,4],[17,13,4],[17,8,6],
 ];
+
+// color + icon mapping for each type (just for visuals)
 const NODE_COLORS={base:"#1D9E75",hospital:"#E24B4A",food:"#EF9F27",water:"#378ADD",shelter:"#a78bfa"};
 const NODE_ICONS={base:"⛺",hospital:"🏥",food:"🥫",water:"💧",shelter:"🏠"};
+
+// colors used for different route legs
 const LEG_COLORS=["#00e5a0","#ffaa00","#ff6eaa","#7ec8ff"];
 
+// state variables (what the app is currently doing)
 let startNode=0,mode="single",multiSel=new Set(),activePaths=[];
 let canvas,ctx,W,H;
 
+// resizes canvas so it looks good on any screen
 function resizeCanvas(){
   const dpr=window.devicePixelRatio||1;
   W=canvas.parentElement.clientWidth; H=canvas.parentElement.clientHeight;
   canvas.width=W*dpr; canvas.height=H*dpr;
   canvas.style.width=W+"px"; canvas.style.height=H+"px";
-  ctx.setTransform(dpr,0,0,dpr,0,0); drawMap();
+  ctx.setTransform(dpr,0,0,dpr,0,0); 
+  drawMap(); // redraw everything after resizing
 }
-function nx(n){return n.x*W;} function ny(n){return n.y*H;}
+
+// helper functions to convert normalized coords → screen coords
+function nx(n){return n.x*W;} 
+function ny(n){return n.y*H;}
+
+// makes sure edge keys are consistent (so 1-2 = 2-1)
 function edgeKey(a,b){return a<b?`${a}-${b}`:`${b}-${a}`;}
 
+
+// draws the entire map (nodes + edges + paths)
 function drawMap(){
   if(!ctx)return;
+
+  // background grid to so it looks cool!
   ctx.clearRect(0,0,W,H);
   ctx.save(); ctx.strokeStyle="rgba(255,255,255,0.022)"; ctx.lineWidth=0.5;
   for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
   for(let y=0;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
   ctx.restore();
 
+  // keeps track of which edges are part of active paths
   const edgeColorMap=new Map();
   activePaths.forEach(({path,color})=>{
-    for(let i=0;i<path.length-1;i++) edgeColorMap.set(edgeKey(path[i],path[i+1]),color);
+    for(let i=0;i<path.length-1;i++) 
+    edgeColorMap.set(edgeKey(path[i],path[i+1]),color);
   });
 
+  // draw all edges (roads)
   EDGES.forEach(([a,b,w])=>{
-    const na=NODES[a],nb=NODES[b],key=edgeKey(a,b),onPath=edgeColorMap.has(key),color=onPath?edgeColorMap.get(key):null;
+    const na=NODES[a],nb=NODES[b],
+    key=edgeKey(a,b),
+    onPath=edgeColorMap.has(key),
+    color=onPath?edgeColorMap.get(key):null;
     ctx.save();
+    
+    // highlight edges that are part of route
     if(onPath){ctx.strokeStyle=color;ctx.lineWidth=3.5;ctx.shadowColor=color;ctx.shadowBlur=7;}
     else{ctx.strokeStyle="rgba(255,255,255,0.10)";ctx.lineWidth=1.5;}
     ctx.beginPath();ctx.moveTo(nx(na),ny(na));ctx.lineTo(nx(nb),ny(nb));ctx.stroke();ctx.restore();
@@ -257,11 +285,15 @@ function drawMap(){
     ctx.fillStyle=onPath?color:"rgba(255,255,255,0.22)";ctx.fillText(w,mx+ox,my+oy);ctx.restore();
   });
 
+  // track which nodes are part of active routes
   const activeNodes=new Set();
   activePaths.forEach(({path})=>path.forEach(id=>activeNodes.add(id)));
 
   NODES.forEach((n,i)=>{
-    const x=nx(n),y=ny(n),color=NODE_COLORS[n.type],isStart=i===startNode,onPath=activeNodes.has(i);
+    const x=nx(n),y=ny(n),
+    color=NODE_COLORS[n.type],
+    isStart=i===startNode,
+    onPath=activeNodes.has(i);
     let nodeColor=color;
     activePaths.forEach(({path,color:lc})=>{if(path.includes(i))nodeColor=lc;});
     if(onPath||isStart){
@@ -297,9 +329,11 @@ function drawMap(){
   updateStats();
 }
 
+// DIJKSTRA (core algorithm for shortest path)
 function dijkstra(start,end){
   const n=NODES.length,dist=Array(n).fill(Infinity),prev=Array(n).fill(null);
-  dist[start]=0;const visited=new Set(),queue=[...Array(n).keys()];
+  dist[start]=0;const visited=new Set(),
+  queue=[...Array(n).keys()];
   while(queue.length){
     queue.sort((a,b)=>dist[a]-dist[b]);const u=queue.shift();
     if(u===end)break;if(dist[u]===Infinity)break;visited.add(u);
@@ -314,8 +348,10 @@ function dijkstra(start,end){
   return{path,cost:dist[end]};
 }
 
+// gets cost between two directly connected nodes
 function getEdgeCost(a,b){const e=EDGES.find(([ea,eb])=>(ea===a&&eb===b)||(ea===b&&eb===a));return e?e[2]:0;}
 
+// greedy multi-destination routing (not perfect, but fast)
 function greedyOrder(start,destIds){
   const unvisited=[...destIds],legPaths=[];let current=start,totalCost=0;
   while(unvisited.length){
