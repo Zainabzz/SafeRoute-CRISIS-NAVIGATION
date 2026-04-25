@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SafeRoute — Crisis Navigation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0d0f14; --surface:#151820; --surface2:#1c2030;
+      --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.15);
+      --text:#e8eaf0; --muted:#7a8099; --accent:#00e5a0; --accent2:#0099ff;
+      --warn:#ffaa00; --font-head:'Syne',sans-serif; --font-body:'Inter',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+    }
+    html,body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;font-size:14px;}
+    header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10;}
+    .logo{display:flex;align-items:center;gap:12px;}
+    .logo-icon{width:34px;height:34px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+    .logo-text{font-family:var(--font-head);font-size:21px;font-weight:800;letter-spacing:-0.5px;}
+    .logo-text span{color:var(--accent);}
+    .header-tag{font-family:var(--font-mono);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:4px 10px;border-radius:4px;letter-spacing:0.5px;}
+    .status-bar{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--accent);}
+    .status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+    .app{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 67px);}
+    .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+    .sidebar::-webkit-scrollbar{width:4px;} .sidebar::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+    .sidebar-section{padding:18px 20px;border-bottom:1px solid var(--border);}
+    .section-label{font-family:var(--font-mono);font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:12px;}
+    .mode-toggle{display:flex;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:3px;gap:3px;margin-bottom:14px;}
+    .mode-btn{flex:1;padding:8px;text-align:center;font-family:var(--font-mono);font-size:10px;letter-spacing:0.5px;color:var(--muted);border-radius:5px;cursor:pointer;border:none;background:transparent;transition:all 0.15s;}
+    .mode-btn.active{background:var(--surface);color:var(--text);border:1px solid var(--border2);}
+    .field{margin-bottom:10px;}
+    .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;}
+    select{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--font-body);font-size:13px;padding:8px 12px;border-radius:6px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%237a8099' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+    select:focus{outline:1px solid var(--accent);border-color:var(--accent);}
+    select option{background:var(--surface2);}
+    .multi-hint{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;}
+    .dest-checkboxes{display:flex;flex-direction:column;gap:5px;max-height:260px;overflow-y:auto;}
+    .dest-checkboxes::-webkit-scrollbar{width:3px;} .dest-checkboxes::-webkit-scrollbar-thumb{background:var(--border2);}
+    .dest-cb-item{display:flex;align-items:center;gap:9px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:border-color 0.12s;user-select:none;}
+    .dest-cb-item:hover{border-color:var(--border2);}
+    .dest-cb-item.checked{border-color:var(--accent);background:rgba(0,229,160,0.06);}
+    .dest-cb-item.disabled{opacity:0.38;cursor:not-allowed;pointer-events:none;}
+    .cb-icon{font-size:13px;flex-shrink:0;}
+    .cb-label{font-size:12px;font-weight:500;flex:1;}
+    .cb-type{font-family:var(--font-mono);font-size:9px;color:var(--muted);text-transform:uppercase;}
+    .cb-check{width:15px;height:15px;border:1px solid var(--border2);border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;transition:all 0.12s;}
+    .dest-cb-item.checked .cb-check{background:var(--accent);border-color:var(--accent);color:#000;}
+    .btn-find{width:100%;padding:11px;background:var(--accent);color:#000;font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:0.5px;border:none;border-radius:6px;cursor:pointer;transition:opacity 0.15s,transform 0.1s;margin-top:6px;}
+    .btn-find:hover{opacity:0.88;} .btn-find:active{transform:scale(0.98);}
+    .stats-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;}
+    .stat-val{font-family:var(--font-mono);font-size:20px;font-weight:500;line-height:1;}
+    .stat-val.accent{color:var(--accent);}
+    .stat-label{font-size:10px;color:var(--muted);margin-top:3px;}
+    #route-panel{padding:18px 20px;flex:1;}
+    .route-empty{color:var(--muted);font-size:12px;line-height:1.7;border:1px dashed var(--border2);border-radius:6px;padding:18px;text-align:center;}
+    .route-empty .arrow{font-size:22px;display:block;margin-bottom:6px;opacity:0.35;}
+    .route-result{display:none;} .route-result.visible{display:block;}
+    .route-dest{font-family:var(--font-head);font-size:17px;font-weight:700;color:var(--accent);margin-bottom:3px;}
+    .route-cost{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px;}
+    .route-steps{display:flex;flex-direction:column;gap:5px;}
+    .route-step{display:flex;align-items:center;gap:10px;padding:8px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;}
+    .route-step.current{border-color:var(--accent2);} .route-step.destination{border-color:var(--accent);}
+    .step-icon{font-size:14px;flex-shrink:0;} .step-name{font-weight:500;flex:1;}
+    .step-badge{font-family:var(--font-mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+    .step-arrow-down{text-align:center;color:var(--muted);font-size:11px;padding:1px 0;font-family:var(--font-mono);}
+    .multi-result{display:none;} .multi-result.visible{display:block;}
+    .multi-total{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px;}
+    .leg-block{margin-bottom:14px;}
+    .leg-header{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+    .leg-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;font-weight:500;flex-shrink:0;}
+    .leg-title{font-size:12px;font-weight:500;flex:1;}
+    .leg-cost{font-family:var(--font-mono);font-size:10px;color:var(--muted);}
+    .leg-steps{display:flex;flex-direction:column;gap:4px;}
+    .leg-step{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;font-size:11px;}
+    .leg-step-icon{font-size:12px;flex-shrink:0;} .leg-step-name{flex:1;}
+    .leg-step-arrow{text-align:center;color:var(--muted);font-size:10px;font-family:var(--font-mono);}
+    .no-route{background:rgba(255,170,0,0.08);border:1px solid rgba(255,170,0,0.3);border-radius:6px;padding:14px;color:var(--warn);font-size:12px;text-align:center;}
+    .legend{display:flex;flex-direction:column;gap:6px;}
+    .legend-item{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);}
+    .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+    .map-area{background:var(--bg);position:relative;overflow:hidden;}
+    #mapCanvas{display:block;width:100%;height:100%;}
+    .map-hint{position:absolute;bottom:14px;right:14px;font-family:var(--font-mono);font-size:9px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 9px;border-radius:4px;pointer-events:none;}
+    .panel{display:none;} .panel.active{display:block;}
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧭</div>
+    <div class="logo-text">Safe<span>Route</span></div>
+    <div class="header-tag">CRISIS NAVIGATION</div>
+  </div>
+  <div class="status-bar"><div class="status-dot"></div>SYSTEM ACTIVE</div>
+</header>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="section-label">Navigation Mode</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="btn-single" onclick="setMode('single')">SINGLE DEST</button>
+        <button class="mode-btn" id="btn-multi" onclick="setMode('multi')">MULTI DEST</button>
+      </div>
+      <div class="field">
+        <label>Your current location</label>
+        <select id="start-sel"></select>
+      </div>
+      <div id="panel-single" class="panel active">
+        <div class="field">
+          <label>I need to reach</label>
+          <select id="dest-sel">
+            <option value="">Nearest resource (any)</option>
+            <option value="hospital">🏥 Hospital / Med post</option>
+            <option value="food">🥫 Food distribution</option>
+            <option value="water">💧 Water source</option>
+            <option value="shelter">🏠 Shelter</option>
+            <option value="base">⛺ Base camp</option>
+          </select>
+        </div>
+        <button class="btn-find" onclick="findSingleRoute()">FIND SAFE ROUTE →</button>
+      </div>
+      <div id="panel-multi" class="panel">
+        <div class="multi-hint">Select up to 4 destinations. SafeRoute will calculate the optimal visit order using shortest path.</div>
+        <div class="dest-checkboxes" id="dest-checkboxes"></div>
+        <button class="btn-find" onclick="findMultiRoute()" style="margin-top:10px">PLAN OPTIMAL ROUTE →</button>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="section-label">Network Status</div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-val accent" id="node-count">18</div><div class="stat-label">Locations</div></div>
+        <div class="stat-card"><div class="stat-val accent" id="edge-count">0</div><div class="stat-label">Roads</div></div>
+        <div class="stat-card"><div class="stat-val accent" id="path-cost">—</div><div class="stat-label">Route cost</div></div>
+        <div class="stat-card"><div class="stat-val accent" id="stops-count">—</div><div class="stat-label">Total stops</div></div>
+      </div>
+    </div>
+    <div id="route-panel">
+      <div class="section-label">Route Plan</div>
+      <div class="route-empty" id="route-empty"><span class="arrow">↑</span>Choose a mode, set your location and destination(s), then click the button above.</div>
+      <div class="route-result" id="route-result">
+        <div class="route-dest" id="route-dest-name"></div>
+        <div class="route-cost" id="route-cost-label"></div>
+        <div class="route-steps" id="route-steps"></div>
+      </div>
+      <div class="multi-result" id="multi-result">
+        <div class="multi-total" id="multi-total-label"></div>
+        <div id="multi-legs"></div>
+      </div>
+      <div class="no-route" id="route-no-route" style="display:none">⚠ No route found. Try a different start or destination.</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="section-label">Map Legend</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#1D9E75"></div>Base camp</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#E24B4A"></div>Hospital / Med post</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#EF9F27"></div>Food distribution</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#378ADD"></div>Water source</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>Shelter</div>
+        <div class="legend-item" style="margin-top:4px"><div style="width:26px;height:3px;background:#00e5a0;border-radius:2px;flex-shrink:0"></div>Leg 1 (route)</div>
+        <div class="legend-item"><div style="width:26px;height:3px;background:#ffaa00;border-radius:2px;flex-shrink:0"></div>Leg 2</div>
+        <div class="legend-item"><div style="width:26px;height:3px;background:#ff6eaa;border-radius:2px;flex-shrink:0"></div>Leg 3</div>
+        <div class="legend-item"><div style="width:26px;height:3px;background:#7ec8ff;border-radius:2px;flex-shrink:0"></div>Leg 4</div>
+      </div>
+    </div>
+  </aside>
+  <main class="map-area">
+    <canvas id="mapCanvas"></canvas>
+    <div class="map-hint">DIJKSTRA'S ALGORITHM — SHORTEST PATH</div>
+  </main>
+</div>
+<script>
+const NODES=[
+  {id:0,label:"Main Camp",type:"base",x:0.08,y:0.48},
+  {id:1,label:"North Shelter",type:"shelter",x:0.22,y:0.14},
+  {id:2,label:"City Hospital",type:"hospital",x:0.55,y:0.08},
+  {id:3,label:"East Food Hub",type:"food",x:0.88,y:0.22},
+  {id:4,label:"River Water",type:"water",x:0.75,y:0.55},
+  {id:5,label:"West Shelter",type:"shelter",x:0.18,y:0.72},
+  {id:6,label:"Med Post Alpha",type:"hospital",x:0.42,y:0.35},
+  {id:7,label:"Food Depot",type:"food",x:0.28,y:0.30},
+  {id:8,label:"South Water",type:"water",x:0.65,y:0.82},
+  {id:9,label:"Forward Base",type:"base",x:0.50,y:0.60},
+  {id:10,label:"Hilltop Shelter",type:"shelter",x:0.70,y:0.18},
+  {id:11,label:"Clinic B",type:"hospital",x:0.82,y:0.68},
+  {id:12,label:"Supply Chain",type:"food",x:0.35,y:0.55},
+  {id:13,label:"Well Station",type:"water",x:0.12,y:0.88},
+  {id:14,label:"Refugee Shelter",type:"shelter",x:0.58,y:0.45},
+  {id:15,label:"North Water",type:"water",x:0.40,y:0.10},
+  {id:16,label:"Aid Camp",type:"base",x:0.88,y:0.45},
+  {id:17,label:"South Shelter",type:"shelter",x:0.30,y:0.88},
+];
+const EDGES=[
+  [0,1,4],[0,5,3],[0,7,5],[0,12,6],
+  [1,2,8],[1,7,4],[1,15,5],[1,6,7],
+  [2,3,6],[2,10,4],[2,15,3],[2,6,5],
+  [3,10,5],[3,16,4],[3,4,7],
+  [4,11,4],[4,8,5],[4,16,6],[4,14,6],
+  [5,12,4],[5,13,5],[5,17,4],[5,0,3],
+  [6,7,3],[6,14,5],[6,9,6],[6,2,5],
+  [7,1,4],[7,12,4],[7,15,6],
+  [8,11,5],[8,17,6],[8,9,6],
+  [9,12,4],[9,14,3],[9,8,6],[9,11,7],
+  [10,2,4],[10,3,5],[10,16,8],
+  [11,4,4],[11,16,5],[11,8,5],
+  [12,5,4],[12,9,4],[12,17,7],
+  [13,5,5],[13,17,4],
+  [14,6,5],[14,9,3],[14,4,6],
+  [15,2,3],[15,1,5],[15,7,6],
+  [16,3,4],[16,11,5],[16,4,6],
+  [17,5,4],[17,13,4],[17,8,6],
+];
+const NODE_COLORS={base:"#1D9E75",hospital:"#E24B4A",food:"#EF9F27",water:"#378ADD",shelter:"#a78bfa"};
+const NODE_ICONS={base:"⛺",hospital:"🏥",food:"🥫",water:"💧",shelter:"🏠"};
+const LEG_COLORS=["#00e5a0","#ffaa00","#ff6eaa","#7ec8ff"];
+
+let startNode=0,mode="single",multiSel=new Set(),activePaths=[];
+let canvas,ctx,W,H;
+
+function resizeCanvas(){
+  const dpr=window.devicePixelRatio||1;
+  W=canvas.parentElement.clientWidth; H=canvas.parentElement.clientHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+"px"; canvas.style.height=H+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0); drawMap();
+}
+function nx(n){return n.x*W;} function ny(n){return n.y*H;}
+function edgeKey(a,b){return a<b?`${a}-${b}`:`${b}-${a}`;}
+
+function drawMap(){
+  if(!ctx)return;
+  ctx.clearRect(0,0,W,H);
+  ctx.save(); ctx.strokeStyle="rgba(255,255,255,0.022)"; ctx.lineWidth=0.5;
+  for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.restore();
+
+  const edgeColorMap=new Map();
+  activePaths.forEach(({path,color})=>{
+    for(let i=0;i<path.length-1;i++) edgeColorMap.set(edgeKey(path[i],path[i+1]),color);
+  });
+
+  EDGES.forEach(([a,b,w])=>{
+    const na=NODES[a],nb=NODES[b],key=edgeKey(a,b),onPath=edgeColorMap.has(key),color=onPath?edgeColorMap.get(key):null;
+    ctx.save();
+    if(onPath){ctx.strokeStyle=color;ctx.lineWidth=3.5;ctx.shadowColor=color;ctx.shadowBlur=7;}
+    else{ctx.strokeStyle="rgba(255,255,255,0.10)";ctx.lineWidth=1.5;}
+    ctx.beginPath();ctx.moveTo(nx(na),ny(na));ctx.lineTo(nx(nb),ny(nb));ctx.stroke();ctx.restore();
+    const mx=(nx(na)+nx(nb))/2,my=(ny(na)+ny(nb))/2;
+    const angle=Math.atan2(ny(nb)-ny(na),nx(nb)-nx(na));
+    const ox=-Math.sin(angle)*11,oy=Math.cos(angle)*11;
+    ctx.save();ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillStyle=onPath?color:"rgba(255,255,255,0.22)";ctx.fillText(w,mx+ox,my+oy);ctx.restore();
+  });
+
+  const activeNodes=new Set();
+  activePaths.forEach(({path})=>path.forEach(id=>activeNodes.add(id)));
+
+  NODES.forEach((n,i)=>{
+    const x=nx(n),y=ny(n),color=NODE_COLORS[n.type],isStart=i===startNode,onPath=activeNodes.has(i);
+    let nodeColor=color;
+    activePaths.forEach(({path,color:lc})=>{if(path.includes(i))nodeColor=lc;});
+    if(onPath||isStart){
+      ctx.save();ctx.beginPath();ctx.arc(x,y,30,0,Math.PI*2);
+      ctx.fillStyle=(isStart?"#0099ff":nodeColor)+"1a";ctx.fill();ctx.restore();
+    }
+    const r=isStart?24:19;
+    ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=onPath||isStart?color:color+"50";ctx.fill();
+    ctx.lineWidth=isStart?2.5:onPath?2:1;
+    ctx.strokeStyle=isStart?"#0099ff":onPath?nodeColor:"rgba(255,255,255,0.12)";
+    if(isStart){ctx.shadowColor="#0099ff";ctx.shadowBlur=10;}
+    ctx.stroke();ctx.restore();
+    ctx.save();ctx.font=`${isStart?13:11}px serif`;ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillText(NODE_ICONS[n.type],x,y-1);ctx.restore();
+    ctx.save();ctx.font=`${onPath||isStart?"500 ":""}11px 'Inter',sans-serif`;
+    ctx.fillStyle=onPath||isStart?"#e8eaf0":"rgba(255,255,255,0.35)";
+    ctx.textAlign="center";ctx.textBaseline="top";ctx.fillText(n.label,x,y+r+4);ctx.restore();
+    if(isStart){
+      ctx.save();ctx.font="500 9px 'IBM Plex Mono',monospace";ctx.fillStyle="#0099ff";
+      ctx.textAlign="center";ctx.textBaseline="bottom";ctx.fillText("YOU",x,y-r-3);ctx.restore();
+    }
+    activePaths.forEach(({path,color:lc},legIdx)=>{
+      const destId=path[path.length-1];
+      if(destId===i&&!isStart){
+        ctx.save();ctx.beginPath();ctx.arc(x+r-2,y-r+2,9,0,Math.PI*2);
+        ctx.fillStyle=lc;ctx.fill();
+        ctx.font="bold 9px 'IBM Plex Mono',monospace";ctx.fillStyle="#000";
+        ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(legIdx+1,x+r-2,y-r+2);ctx.restore();
+      }
+    });
+  });
+  updateStats();
+}
+
+function dijkstra(start,end){
+  const n=NODES.length,dist=Array(n).fill(Infinity),prev=Array(n).fill(null);
+  dist[start]=0;const visited=new Set(),queue=[...Array(n).keys()];
+  while(queue.length){
+    queue.sort((a,b)=>dist[a]-dist[b]);const u=queue.shift();
+    if(u===end)break;if(dist[u]===Infinity)break;visited.add(u);
+    EDGES.forEach(([a,b,w])=>{
+      let neighbor=null;if(a===u)neighbor=b;else if(b===u)neighbor=a;
+      if(neighbor===null||visited.has(neighbor))return;
+      const alt=dist[u]+w;if(alt<dist[neighbor]){dist[neighbor]=alt;prev[neighbor]=u;}
+    });
+  }
+  if(dist[end]===Infinity)return{path:[],cost:Infinity};
+  const path=[];let cur=end;while(cur!==null){path.unshift(cur);cur=prev[cur];}
+  return{path,cost:dist[end]};
+}
+
+function getEdgeCost(a,b){const e=EDGES.find(([ea,eb])=>(ea===a&&eb===b)||(ea===b&&eb===a));return e?e[2]:0;}
+
+function greedyOrder(start,destIds){
+  const unvisited=[...destIds],legPaths=[];let current=start,totalCost=0;
+  while(unvisited.length){
+    let bestCost=Infinity,bestIdx=-1,bestPath=[];
+    unvisited.forEach((id,idx)=>{
+      const{path,cost}=dijkstra(current,id);if(cost<bestCost){bestCost=cost;bestIdx=idx;bestPath=path;}
+    });
+    if(bestIdx===-1)break;
+    legPaths.push({path:bestPath,cost:bestCost,dest:unvisited[bestIdx]});
+    totalCost+=bestCost;current=unvisited[bestIdx];unvisited.splice(bestIdx,1);
+  }
+  return{legPaths,totalCost};
+}
+
+function findSingleRoute(){
+  const destType=document.getElementById("dest-sel").value;
+  const targets=destType
+    ?NODES.map((_,i)=>i).filter(i=>NODES[i].type===destType&&i!==startNode)
+    :NODES.map((_,i)=>i).filter(i=>i!==startNode);
+  let best={path:[],cost:Infinity};
+  targets.forEach(t=>{const res=dijkstra(startNode,t);if(res.cost<best.cost)best=res;});
+  activePaths=best.path.length?[{path:best.path,color:LEG_COLORS[0]}]:[];
+  clearResults();
+  if(!best.path.length){document.getElementById("route-no-route").style.display="block";}
+  else{
+    const dest=NODES[best.path[best.path.length-1]];
+    document.getElementById("route-dest-name").textContent=dest.label;
+    document.getElementById("route-cost-label").textContent=`Travel cost: ${best.cost} units · ${best.path.length-1} leg${best.path.length>2?"s":""}`;
+    const stepsEl=document.getElementById("route-steps");stepsEl.innerHTML="";
+    best.path.forEach((nid,idx)=>{
+      const n=NODES[nid],isFirst=idx===0,isLast=idx===best.path.length-1;
+      const div=document.createElement("div");
+      div.className="route-step"+(isFirst?" current":"")+(isLast?" destination":"");
+      div.innerHTML=`<span class="step-icon">${NODE_ICONS[n.type]}</span><span class="step-name">${n.label}</span><span class="step-badge">${isFirst?"START":isLast?"DEST":n.type}</span>`;
+      stepsEl.appendChild(div);
+      if(!isLast){const arr=document.createElement("div");arr.className="step-arrow-down";arr.textContent=`↓  cost: ${getEdgeCost(nid,best.path[idx+1])}`;stepsEl.appendChild(arr);}
+    });
+    document.getElementById("route-result").classList.add("visible");
+    document.getElementById("path-cost").textContent=best.cost;
+    document.getElementById("stops-count").textContent=best.path.length;
+  }
+  drawMap();
+}
+
+function findMultiRoute(){
+  if(multiSel.size===0){alert("Please select at least one destination.");return;}
+  const destIds=[...multiSel].filter(id=>id!==startNode);
+  const{legPaths,totalCost}=greedyOrder(startNode,destIds);
+  activePaths=legPaths.map((leg,i)=>({path:leg.path,color:LEG_COLORS[i%LEG_COLORS.length]}));
+  clearResults();
+  if(!legPaths.length){document.getElementById("route-no-route").style.display="block";}
+  else{
+    document.getElementById("multi-total-label").textContent=`Total cost: ${totalCost} units across ${legPaths.length} leg${legPaths.length>1?"s":""}`;
+    const legsEl=document.getElementById("multi-legs");legsEl.innerHTML="";
+    legPaths.forEach((leg,legIdx)=>{
+      const color=LEG_COLORS[legIdx%LEG_COLORS.length],destNode=NODES[leg.dest];
+      const block=document.createElement("div");block.className="leg-block";
+      block.innerHTML=`<div class="leg-header"><div class="leg-num" style="background:${color}22;color:${color};border:1px solid ${color}55">${legIdx+1}</div><span class="leg-title">${legIdx===0?"Start →":"Then →"} ${destNode.label}</span><span class="leg-cost">cost: ${leg.cost}</span></div><div class="leg-steps" id="leg-steps-${legIdx}"></div>`;
+      legsEl.appendChild(block);
+      const stepsEl=document.getElementById(`leg-steps-${legIdx}`);
+      leg.path.forEach((nid,idx)=>{
+        const n=NODES[nid],isLast=idx===leg.path.length-1;
+        const div=document.createElement("div");div.className="leg-step";div.style.borderColor=isLast?color:"";
+        div.innerHTML=`<span class="leg-step-icon">${NODE_ICONS[n.type]}</span><span class="leg-step-name">${n.label}</span>`;
+        stepsEl.appendChild(div);
+        if(!isLast){const arr=document.createElement("div");arr.className="leg-step-arrow";arr.textContent=`↓  ${getEdgeCost(nid,leg.path[idx+1])}`;stepsEl.appendChild(arr);}
+      });
+    });
+    document.getElementById("multi-result").classList.add("visible");
+    document.getElementById("path-cost").textContent=totalCost;
+    document.getElementById("stops-count").textContent=legPaths.reduce((s,l)=>s+l.path.length,0);
+  }
+  drawMap();
+}
+
+function clearResults(){
+  document.getElementById("route-empty").style.display="none";
+  document.getElementById("route-result").classList.remove("visible");
+  document.getElementById("multi-result").classList.remove("visible");
+  document.getElementById("route-no-route").style.display="none";
+}
+
+function setMode(m){
+  mode=m;
+  document.getElementById("btn-single").classList.toggle("active",m==="single");
+  document.getElementById("btn-multi").classList.toggle("active",m==="multi");
+  document.getElementById("panel-single").classList.toggle("active",m==="single");
+  document.getElementById("panel-multi").classList.toggle("active",m==="multi");
+  activePaths=[];clearResults();
+  document.getElementById("route-empty").style.display="block";
+  document.getElementById("path-cost").textContent="—";
+  document.getElementById("stops-count").textContent="—";
+  drawMap();
+}
+
+function updateStats(){
+  document.getElementById("node-count").textContent=NODES.length;
+  document.getElementById("edge-count").textContent=EDGES.length;
+}
+
+function populateStartSel(){
+  const sel=document.getElementById("start-sel");sel.innerHTML="";
+  NODES.forEach((n,i)=>{
+    const opt=document.createElement("option");opt.value=i;opt.textContent=NODE_ICONS[n.type]+"  "+n.label;sel.appendChild(opt);
+  });
+  sel.value=0;
+  sel.onchange=()=>{
+    startNode=parseInt(sel.value);activePaths=[];clearResults();
+    document.getElementById("route-empty").style.display="block";
+    document.getElementById("path-cost").textContent="—";
+    document.getElementById("stops-count").textContent="—";
+    buildMultiCheckboxes();drawMap();
+  };
+}
+
+function buildMultiCheckboxes(){
+  const container=document.getElementById("dest-checkboxes");container.innerHTML="";multiSel=new Set();
+  NODES.forEach((n,i)=>{
+    if(i===startNode)return;
+    const item=document.createElement("div");item.className="dest-cb-item";item.dataset.id=i;
+    item.innerHTML=`<span class="cb-icon">${NODE_ICONS[n.type]}</span><span class="cb-label">${n.label}</span><span class="cb-type">${n.type}</span><span class="cb-check"></span>`;
+    item.onclick=()=>toggleDestCb(i,item);container.appendChild(item);
+  });
+}
+
+function toggleDestCb(id,el){
+  if(el.classList.contains("disabled"))return;
+  if(multiSel.has(id)){multiSel.delete(id);el.classList.remove("checked");el.querySelector(".cb-check").textContent="";}
+  else{
+    if(multiSel.size>=4)return;
+    multiSel.add(id);el.classList.add("checked");el.querySelector(".cb-check").textContent="✓";
+  }
+  document.querySelectorAll(".dest-cb-item").forEach(item=>{
+    const iid=parseInt(item.dataset.id);
+    if(!multiSel.has(iid))item.classList.toggle("disabled",multiSel.size>=4);
+  });
+}
+
+window.addEventListener("load",()=>{
+  canvas=document.getElementById("mapCanvas");ctx=canvas.getContext("2d");
+  populateStartSel();buildMultiCheckboxes();resizeCanvas();
+  window.addEventListener("resize",resizeCanvas);updateStats();
+});
+</script>
+</body>
+</html>
