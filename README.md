@@ -1,5 +1,6 @@
 # SafeRoute - Crisis Navigation System
 **CMPSC 463 | Project 2 | Zainab Afridi & Yuliana Gryb**
+link: https://zainabzz.github.io/SafeRoute-CRISIS-NAVIGATION/
 
 ---
 
